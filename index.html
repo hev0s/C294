@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestion Étudiants Vue.js</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        /* Un peu de CSS pour affiner le look des inputs comme sur l'image */
+        .form-control, .form-select {
+            background-color: #fff;
+            border: 1px solid #dee2e6;
+        }
+        .emoji-display {
+            font-size: 2.5rem; /* Emoji plus gros */
+            margin-top: 0.5rem;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div id="app">
+    <div class="container py-5">
+
+        <div class="row justify-content-center">
+            <div :class="students.length > 0 ? 'col-md-5' : 'col-md-8'">
+                <student-form @add-student="addStudent"></student-form>
+            </div>
+
+            <div class="col-md-7" v-if="students.length > 0">
+                <student-list :students="students"></student-list>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, reactive, computed } = Vue;
+
+    // --- COMPOSANT 1 : LE FORMULAIRE (Style adapté à l'image) ---
+    const StudentForm = {
+        template: `
+          <div class="bg-white p-4 rounded shadow-sm">
+            <h2 class="text-center mb-4">Formulaire d'inscription</h2>
+
+            <form @submit.prevent="submitForm">
+
+              <div class="row mb-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Nom :</label>
+                  <input type="text" v-model="form.lastName" class="form-control" placeholder="Votre nom" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold">Prénom :</label>
+                  <input type="text" v-model="form.firstName" class="form-control" placeholder="Votre prénom" required>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold">Description :</label>
+                <textarea v-model="form.motivation" class="form-control" rows="3" placeholder="Décrivez-nous votre motivation"></textarea>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold">Sexe :</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="gender" id="genderM" value="Homme" v-model="form.gender">
+                  <label class="form-check-label" for="genderM">M</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="gender" id="genderF" value="Femme" v-model="form.gender">
+                  <label class="form-check-label" for="genderF">F</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="gender" id="genderOther" value="Autre" v-model="form.gender">
+                  <label class="form-check-label" for="genderOther">Autre</label>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold">Centres d'intérêt :</label>
+                <div v-for="option in interestOptions" :key="option" class="form-check">
+                  <input class="form-check-input" type="checkbox" :value="option" v-model="form.interests"
+                         :disabled="form.interests.length >= 3 && !form.interests.includes(option)">
+                  <label class="form-check-label">{{ option }}</label>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-bold">Date de naissance :</label>
+                <input type="date" v-model="form.dob" class="form-control" placeholder="jj.mm.aaaa">
+              </div>
+
+              <div class="mb-4">
+                <label class="form-label fw-bold">Caractère :</label>
+                <input type="range" v-model.number="form.mood" class="form-range" min="10" max="100" step="10">
+                <div class="emoji-display">{{ currentEmoji }}</div>
+              </div>
+
+              <div class="text-center">
+                <button type="submit" class="btn btn-primary px-5">Soumettre</button>
+              </div>
+            </form>
+          </div>
+        `,
+        emits: ['add-student'],
+        setup(props, { emit }) {
+            const interestOptions = ['Sport', 'Environnement', 'Science', 'Technologie', 'Actualité'];
+            // Valeurs par défaut
+            const form = reactive({
+                firstName: '',
+                lastName: '',
+                dob: '',
+                gender: 'Homme', // Pré-sélectionné pour les radios
+                mood: 10,        // Commencer triste/bas pour matcher l'image
+                motivation: '',
+                interests: []
+            });
+
+            function getEmojiByMood(mood) {
+                let emojis = ["😢", "😁", "😊", "😒", "😃", "😐", "😖", "😤", "😟", "😆"];
+                let index = Math.floor(mood / 10) - 1;
+                if (index === -1) index = 0;
+                if (index >= emojis.length) index = emojis.length - 1;
+                return emojis[index];
+            }
+
+            const currentEmoji = computed(() => getEmojiByMood(form.mood));
+
+            const submitForm = () => {
+                if (!form.firstName || !form.lastName) return;
+                const newStudent = { ...form, emoji: getEmojiByMood(form.mood) };
+                emit('add-student', newStudent);
+
+                // Reset du formulaire
+                form.firstName = '';
+                form.lastName = '';
+                form.dob = '';
+                form.motivation = '';
+                form.interests = [];
+                form.mood = 10;
+                form.gender = 'Homme';
+            };
+
+            return { form, interestOptions, currentEmoji, submitForm };
+        }
+    };
+
+    // --- COMPOSANT 2 : LA LISTE (Reste fonctionnelle) ---
+    const StudentList = {
+        props: ['students'],
+        template: `
+          <div class="bg-white p-4 rounded shadow-sm h-100">
+            <h3 class="mb-4 text-center">Liste des inscrits</h3>
+            <div class="row g-3">
+              <div class="col-12" v-for="(student, index) in students" :key="index">
+                <div class="card border-0 shadow-sm bg-light">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <h5 class="card-title text-primary mb-0">{{ student.firstName }} {{ student.lastName }}</h5>
+                      <span class="fs-2">{{ student.emoji }}</span>
+                    </div>
+                    <h6 class="card-subtitle mb-2 text-muted">{{ student.gender }} - Né(e) le {{ formatDate(student.dob) }}</h6>
+
+                    <p class="card-text small mb-1"><strong>Intérêts :</strong> {{ student.interests.join(', ') || 'Aucun' }}</p>
+                    <p class="card-text small bg-white p-2 rounded border"><em>"{{ student.motivation || "..." }}"</em></p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `,
+        setup() {
+            const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR') : 'Non renseignée';
+            return { formatDate };
+        }
+    };
+
+    // --- APPLICATION PRINCIPALE ---
+    const app = createApp({
+        setup() {
+            const students = ref([]);
+            const addStudent = (newStudent) => {
+                students.value.push(newStudent);
+            };
+            return { students, addStudent };
+        }
+    });
+
+    app.component('student-form', StudentForm);
+    app.component('student-list', StudentList);
+    app.mount('#app');
+</script>
+</body>
+</html>
